@@ -26,6 +26,24 @@ func (h *DumpHead) Write(w io.Writer) error {
 	return binary.Write(w, binary.BigEndian, h.CommitID)
 }
 
+// GetSnapshot get the store's snapshot
+func (l *Ledis) GetSnapshot() (snap *store.Snapshot, commitID uint64, err error) {
+	l.wLock.Lock()
+
+	if l.r != nil {
+		if commitID, err = l.r.LastCommitID(); err != nil {
+			l.wLock.Unlock()
+			return nil ,0, err
+		}
+	}
+
+	if snap, err = l.ldb.NewSnapshot(); err != nil {
+		l.wLock.Unlock()
+		return nil ,0, err
+	}
+	return
+}
+
 // DumpFile dumps data to the file
 func (l *Ledis) DumpFile(path string) error {
 	f, err := os.Create(path)
