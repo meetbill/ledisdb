@@ -29,16 +29,14 @@ func (h *DumpHead) Write(w io.Writer) error {
 // GetSnapshot get the store's snapshot
 func (l *Ledis) GetSnapshot() (snap *store.Snapshot, commitID uint64, err error) {
 	l.wLock.Lock()
-
+	defer l.wLock.Unlock()
 	if l.r != nil {
 		if commitID, err = l.r.LastCommitID(); err != nil {
-			l.wLock.Unlock()
 			return nil ,0, err
 		}
 	}
 
 	if snap, err = l.ldb.NewSnapshot(); err != nil {
-		l.wLock.Unlock()
 		return nil ,0, err
 	}
 	return
