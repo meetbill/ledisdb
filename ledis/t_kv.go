@@ -292,14 +292,19 @@ func (db *DB) Set(key []byte, value []byte) error {
 	}
 
 	var err error
+	orginKey := key
 	key = db.encodeKVKey(key)
 
 	t := db.kvBatch
-
 	t.Lock()
 	defer t.Unlock()
 
 	t.Put(key, value)
+
+	_, err = db.rmExpire(t, KVType, orginKey) //remove key ttl info
+	if err != nil {
+		return err
+	}
 
 	err = t.Commit()
 
@@ -356,6 +361,29 @@ func (db *DB) SetEX(key []byte, duration int64, value []byte) error {
 
 	t.Put(ek, value)
 	db.expireAt(t, KVType, key, time.Now().Unix()+duration)
+
+	return t.Commit()
+}
+
+// SetEXAT sets the data with a timestamp.
+func (db *DB) SetEXAT(key []byte, timestamp int64, value []byte) error {
+	if err := checkKeySize(key); err != nil {
+		return err
+	} else if err := checkValueSize(value); err != nil {
+		return err
+	} else if timestamp <= time.Now().Unix() {
+		return errExpireValue
+	}
+
+	ek := db.encodeKVKey(key)
+
+	t := db.kvBatch
+
+	t.Lock()
+	defer t.Unlock()
+
+	t.Put(ek, value)
+	db.expireAt(t, KVType, key, timestamp)
 
 	return t.Commit()
 }
@@ -504,9 +532,11 @@ func (db *DB) StrLen(key []byte) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-
-	n := s.Size()
-	s.Free()
+	n := 0
+	if s != nil {
+		n = s.Size()
+		s.Free()
+	}
 	return int64(n), nil
 }
 
